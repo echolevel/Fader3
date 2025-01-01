@@ -64,3 +64,12 @@ If everything's soldered up properly, then you should now be able to replug the 
 * I got my faders from Amazon in the UK, listed as ['sourcing map B103 128mm 10k double potentiometers'](https://www.amazon.co.uk/gp/product/B07W3J5ZVM/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1); after a bit of detective work, I found that the Bourne datasheet linked above matches these exactly. Perhaps they're licensed, or a knock-off, I'm not sure. 
 * I'm sorry, I can't make one for you! When I made Knobber over a decade ago, a lot of people asked me to make one for them and I just didn't have the time. I still don't! But I've shared as much info as I can to help any intrepid DIYer make their own. 
 * Rudimentary soldering skills and access to a 3D printer (often available cheaply or for free at local maker spaces) should be all you need - although I accept no responsibility if anything goes terribly wrong, causes an accident, causes you to lose money by buying the wrong parts, etc. All the above is what worked for me; your mileage may vary.
+
+## Changes / To Do:
+
+### To do
+* Rotate case before exporting STL
+* Improve base so it extends the full length while still allowing Pico to be flush
+
+### Changes
+* 2024-01-01 Initial commit
