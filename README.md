@@ -1,19 +1,19 @@
 # Fader3
  3-fader USB MIDI controller
 
-## Project spec - why?
+![photo of Fader3 on my desk; also my computer keyboard, my MIDI piano keyboard, and some tools used to finish the Fader3 case](hero_shot.jpg)
+
+## Project Spec
 
 I wanted a USB MIDI controller consisting of only 3 faders, and while they needed to be the longest-throw faders possible, I also wanted the device to take up as little space on my desk as possible - in height as well as width and depth.
+
+![TinkerCAD view of the case design](Case_Perspective.jpg)
 
 Like a lot of composers, I control expression and dynamics of software instruments such as orchestral sample libraries using some kind of hardware control with one hand, while playing notes on a keyboard using the other. 
 
 And because I also do a lot of audio post, dialogue editing and dubbing mixes, I wanted another fader that I could arbitrarily map to gain stage controls on a per-track basis in my DAW - this is essential for recording large amounts of volume automation in an efficient way. 
 
 Very nice devices of this type are commercially available, but they often have cases that are a bit too large for my tastes - usually due to having LCD displays and/or buttons for extra functionality. I'd rather save the desk space and use raw SYSEX messages to change setting when (rarely) necessary.
-
-![photo of Fader3 on my desk; also my computer keyboard, my MIDI piano keyboard, and some tools used to finish the Fader3 case](hero_shot.jpg)
-
-![TinkerCAD view of the case design](Case_Perspective.jpg)
 
 ![TinkerCAD view of the case design](Case_Parts.jpg)
 
@@ -51,7 +51,7 @@ The Pico will need to distribute 3.3v and GND to each fader's 1 and 3 pins in pa
 
 The first time you plug in a new Pico, you'll see a mass storage device appear. The circuitpython firmware UF2 from adafruit should be dragged into this device, which will cause the Pico's bootloader to be overwritten. When it's replugged, you should see another mass storage device: CIRCUITPY. This is where you'll be putting boot.py and code.py. 
 
-But first, edit code.py to set up some values - CC numbers, channel, etc.
+But first, edit code.py to set up some values - CC numbers, channel, etc. Mu Editor might be a good choice for making these changes, since it's set up with some contextual help for Micropython/Circuitpython.
 
 Into the libs directory, place the adafruit_midi directory and its contents from [here](https://github.com/adafruit/Adafruit_CircuitPython_MIDI).
 
@@ -61,15 +61,33 @@ If everything's soldered up properly, then you should now be able to replug the 
 
 ## Notes:
 
-* I got my faders from Amazon in the UK, listed as ['sourcing map B103 128mm 10k double potentiometers'](https://www.amazon.co.uk/gp/product/B07W3J5ZVM/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1); after a bit of detective work, I found that the Bourne datasheet linked above matches these exactly. Perhaps they're licensed, or a knock-off, I'm not sure. 
-* I'm sorry, I can't make one for you! When I made Knobber over a decade ago, a lot of people asked me to make one for them and I just didn't have the time. I still don't! But I've shared as much info as I can to help any intrepid DIYer make their own. 
-* Rudimentary soldering skills and access to a 3D printer (often available cheaply or for free at local maker spaces) should be all you need - although I accept no responsibility if anything goes terribly wrong, causes an accident, causes you to lose money by buying the wrong parts, etc. All the above is what worked for me; your mileage may vary.
+### Faders
+I got my faders from Amazon in the UK, listed as ['sourcing map B103 128mm 10k double potentiometers'](https://www.amazon.co.uk/gp/product/B07W3J5ZVM/); after a bit of detective work, I found that the Bourne datasheet linked above matches these exactly. Perhaps they're licensed, or a knock-off, I'm not sure. 
+
+### Availability
+I'm sorry, I can't make one for you! When I made Knobber over a decade ago, a lot of people asked me to make one for them and I just didn't have the time. I still don't! But I've shared as much info as I can to help any intrepid DIYer make their own. 
+
+### DIY
+Rudimentary soldering skills and access to a 3D printer (often available cheaply or for free at local maker spaces) should be all you need - although I accept no responsibility if anything goes terribly wrong, causes an accident, causes you to lose money by buying the wrong parts, etc. All the above is what worked for me; your mileage may vary.
+
+### Technical
+The Raspberry Pi Pico has 3 ADC (analogue to digital converter) channels which - allegedly - suffer from some noise at the upper and lower end of their ranges due to the Pico's built in voltage-referencing system. I definitely found jittering throughout and a great amount of it near the top of the faders. 
+
+Jitter's a problem here mainly because you get inconsistent values for a given fader position, but also because jittery values create an endless stream of MIDI messages which can really clog up your project automation fast. 
+
+I have three techniques for dealing with this: 
+1. I compare new CC values against previous values and only send a message if the value has changed beyond a threshold (1 by default) 
+2. At the cost of a tiny amount of latency I take an average of 64 samples from each ADC pin rather than a single read (number of samples can be configured)
+3. I zero the lower 4 bits of the Pico ADCs' 12-bit values in order to get an 8-bit value, which is still more than we need for the 7-bit range (0 to 127) of standard resolution MIDI. It would be cool to try doing 14-bit (or high-res) MIDI, but I'd probably need to use an external 16-bit ADC board rather than 'upscaling' the Pico's 12-bit values... I have some external ADC boards and I'll test this some time.
 
 ## Changes / To Do:
 
 ### To do
 * Rotate case before exporting STL
 * Improve base so it extends the full length while still allowing Pico to be flush
+* Maybe clarify some stuff with the code
+* Implement the sysex config
+* Consider a startup mode to force mass storage - maybe all faders to max when plugging in? 
 
 ### Changes
 * 2024-01-01 Initial commit
