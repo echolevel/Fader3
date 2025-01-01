@@ -73,7 +73,7 @@ Rudimentary soldering skills and access to a 3D printer (often available cheaply
 ### Technical
 The Raspberry Pi Pico has 3 ADC (analogue to digital converter) channels which - allegedly - suffer from some noise at the upper and lower end of their ranges due to the Pico's built in voltage-referencing system. I definitely found jittering throughout and a great amount of it near the top of the faders. 
 
-Jitter's a problem here mainly because you get inconsistent values for a given fader position, but also because jittery values create an endless stream of MIDI messages which can really clog up your project automation fast. 
+Jitter's a problem for us  mainly because we get inconsistent values for a given fader position, but also because jittery values create an endless stream of MIDI messages which can really clog up a DAW project's automation fast. 
 
 I have three techniques for dealing with this: 
 1. I compare new CC values against previous values and only send a message if the value has changed beyond a threshold (1 by default) 
