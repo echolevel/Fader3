@@ -16,3 +16,11 @@ lib/adafruit_midi/start.py
 lib/adafruit_midi/stop.py
 lib/adafruit_midi/system_exclusive.py
 lib/adafruit_midi/timing_clock.py
+Fader3.code-workspace
+.vscode/settings.json
+lib/adafruit_ads1x15/__init__.py
+lib/adafruit_ads1x15/ads1x15.mpy
+lib/adafruit_ads1x15/ads1015.mpy
+lib/adafruit_ads1x15/ads1115.mpy
+lib/adafruit_ads1x15/analog_in.mpy
+lib/adafruit_ads1x15/py.typed
