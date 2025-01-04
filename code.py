@@ -1,8 +1,11 @@
-import board, analogio, usb_midi, adafruit_midi, busio 
+import board, analogio, usb_midi, adafruit_midi, busio, microcontroller
 from time import sleep
 from adafruit_midi.control_change import ControlChange
 
 sleep(1) # avoid a race condition on some systems
+
+print(f"Original CPU Frequency: {microcontroller.cpu.frequency}Hz")
+microcontroller.cpu.frequency = 270_000_000
 
 def clamp(value, min_val, max_val):
     return max(min(value, max_val), min_val)
@@ -21,15 +24,15 @@ faderMidiChannel = [0, 0, 0]
 # mapping accordingly.
 faderCCNumber = [14, 15, 30]
 # Selectively enable/disable faders (disabled faders will be ignored)
-faderEnabled = [True, False, False]
+faderEnabled = [True, True, True]
 # When true, and if an ADS1115 board is found, CCs will be sent as 14bit MIDI pairs
 enable14bitmode = [True, True, True]
 # Set the number of ADC samples from which to get a smoothed value.
 # Greater values may reduce jitter.
-smoothingSamples = 24.0
+smoothingSamples14bit = 2.0
+smoothingSamples7bit = 4.0
 # Increasing may reduce jitter, but will also reduce responsiveness/accuracy
-newValueThreshold14bit = 5
-# Increasing may reduce jitter, but will also reduce responsiveness/accuracy
+newValueThreshold14bit = 20
 newValueThreshold7bit = 1
 # If true, and usb_cdc.disable() is commented out in boot.py, debug messages will be printed 
 # to serial monitor
@@ -51,6 +54,7 @@ faderPrevOutput = [0, 0, 0]
 faderADCValue = [0.0, 0.0, 0.0]
 global faders
 
+messageCounter = 0
 
 try:
     if enableDebugMode: print ("Checking I2C")
@@ -62,10 +66,20 @@ try:
     from adafruit_ads1x15.ads1x15 import Mode
 
     ads = ADS.ADS1115(i2c)
-    ads.mode = Mode.CONTINUOUS
+    
+    # Continuous mode is megafast when using one channel, but causes chaos when using multiple 
+    # channels. It gives you the most recent value that the ADS1115 has started to convert, on
+    # ANY pin, without waiting for it to be converted; so all pins get all values at once and
+    # the data is basically useless. 
+    # You might want to set up Fader3 with two faders doing 7-bit control and wired to the 
+    # built-in Pico ADCs and the third wired to the ADS1115. The code might work as-is; if not,
+    # it should be easy to adapt.
+    #ads.mode = Mode.CONTINUOUS
+
     # Data rate must be one of: [8, 16, 32, 64, 128, 250, 475, 860]
-    # 250 seems like a good sample rate for avoiding stationary jitter
-    ads.data_rate = 250
+    # 250 is a good sample rate for avoiding stationary jitter when using one channel, but for
+    # multiple channels it needs to be as high as possible in Single mode.
+    ads.data_rate = 860
     ads.gain = 1
     faders = [0, 0, 0]
     if faderEnabled[0]:
@@ -93,10 +107,10 @@ while True:
                 
                 # Average n reads to reduce jitter
                 faderaverage = 0
-                for i in range(0, int(smoothingSamples)):                    
+                for i in range(0, int(smoothingSamples14bit)):                    
                     faderaverage += faders[f].value
 
-                faderADCValue[f] = faderaverage / smoothingSamples
+                faderADCValue[f] = faderaverage / smoothingSamples14bit
 
                 # The effective bit-depth of the ADS1115 is 15, since the 16th is used as 
                 # the sign byte. Plus we lose some resolution in the voltage range we're 
@@ -106,7 +120,7 @@ while True:
                 # the fader...
 
                 # scale observed range max to 14bit maxD
-                faderADCValue[f] = (int(faderADCValue[f]) * 16383) // 25868 
+                faderADCValue[f] = (int(faderADCValue[f]) * 16383) // 26000
 
                 faderADCValue[f] = faderADCValue[f] & 0x3FFF # Mask to 14bit
 
@@ -116,7 +130,7 @@ while True:
                 if enable14bitmode[f]:
                 
                     if abs(faderADCValue[f] - faderPrevOutput[f]) >= newValueThreshold14bit:    
-                        if enableDebugMode: print ('Fader'+str(f) + ' 16bit: ' + str(faders[f].value) \
+                        if enableDebugMode: print (f'Count: {messageCounter}' + ' Fader'+str(f) + ' 16bit: ' + str(faders[f].value) \
                                                     + ' 14bit: ' + str(faderADCValue[f]))
                         faderPrevOutput[f] = faderADCValue[f]
                         ccUpper = faderADCValue[f] & 0x7f
@@ -124,6 +138,7 @@ while True:
                     
                         midi[f].send(ControlChange(faderCCNumber[f]+32, ccUpper))
                         midi[f].send(ControlChange(faderCCNumber[f], ccLower))
+                        messageCounter += 1
 
                 else: # send 7-bit messages
                     fader7bitvalue = faderADCValue[f] & 0x7f
@@ -142,13 +157,13 @@ while True:
 
                 # Average n reads to reduce jitter
                 faderaverage = 0
-                for i in range(0, int(smoothingSamples)):
+                for i in range(0, int(smoothingSamples14bit)):
                     # Zeroing the lower 4 bits mitigates noise in the upper part of Pico's ADC range.
                     # 8bit resolution is adequate for our purposes.
                     reading8bit = (faders[f].value >> 4) << 4
                     faderaverage += reading8bit
 
-                faderADCValue[f] = faderaverage / smoothingSamples
+                faderADCValue[f] = faderaverage / smoothingSamples14bit
 
                 # Convert to MIDI CC range 0-127 if using 7-bit
                 fader7bitvalue = int(faderADCValue[f]/65535 * 127)

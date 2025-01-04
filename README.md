@@ -14,6 +14,7 @@ Fader3 acts as a conventional 7-bit MIDI controller by default, but when an inex
 ### Hardware
 * Raspberry Pi Pico
 * Three 100mm-throw B-taper (linear) faders matching [these dimensions](https://www.bourns.com/docs/Product-Datasheets/PTB.pdf)
+* ADS1115 analogue-digital converter board
 * Wire, M3 bolts, M2 bolts
 * Access to some kind of 3D printer
 * 3x fader/linear slider caps with 8mm x 1.2mm hole (min shaft depth 3.0mm, max shaft depth 6.5mm)
@@ -52,12 +53,13 @@ The first time you plug in a new Pico, you'll see a mass storage device appear. 
 
 But first, edit code.py to set up some values - CC numbers, channel, etc. Mu Editor might be a good choice for making these changes, since it's set up with some contextual help for Micropython/Circuitpython.
 
-Into the libs directory, place the adafruit_midi directory and its contents from:
- [https://github.com/adafruit/Adafruit_CircuitPython_MIDI](https://github.com/adafruit/Adafruit_CircuitPython_MIDI). 
+Into the libs directory on CIRCUITPY, place the adafruit_midi directory and its contents from
+[https://github.com/adafruit/Adafruit_CircuitPython_MIDI](https://github.com/adafruit/Adafruit_CircuitPython_MIDI). 
  
- Do the same with the adafruit_ads1x15 directory and its contents from: [https://github.com/adafruit/Adafruit_CircuitPython_ADS1x15/releases/download/2.4.1/adafruit-circuitpython-ads1x15-9.x-mpy-2.4.1.zip](https://github.com/adafruit/Adafruit_CircuitPython_ADS1x15/releases/download/2.4.1/adafruit-circuitpython-ads1x15-9.x-mpy-2.4.1.zip).
+Do the same with the adafruit_ads1x15 directory and its contents from
+[https://github.com/adafruit/Adafruit_CircuitPython_ADS1x15/releases/download/2.4.1/adafruit-circuitpython-ads1x15-9.x-mpy-2.4.1.zip](https://github.com/adafruit/Adafruit_CircuitPython_ADS1x15/releases/download/2.4.1/adafruit-circuitpython-ads1x15-9.x-mpy-2.4.1.zip).
 
-Now drag adafruit_midi into the CIRCUITPY\libs directory, and code.py and boot.py into the CIRCUITPY root.
+Now drag code.py and boot.py into the CIRCUITPY root.
 
 If everything's soldered up properly, then you should now be able to replug the device and see a new MIDI device called 'CircuitPython Audio' with CC commands appearing on the specified numbers.
 
@@ -67,6 +69,20 @@ If everything's soldered up properly, then you should now be able to replug the 
 ### Using Pico's internal ADC:
 [<img src="schematic_internal_adc.jpg" width="600px"/>](schematic_internal_adc.jpg)
 
+## Config options:
+
+* faderMidiChannel (array): set a MIDI channel for each fader separately
+* faderCCNumber: set a CC number for each fader separately
+* faderEnabled: set True or False to toggle a fader on or off
+* enable14bitmode: set True or False to enable 14-bit MIDI mode on each individual fader
+* smoothingSamples14bit: if you're experiencing jitter, adjusting this value might help. Higher values mean more smoothing but introduce slightly more lag. The value represents the number of fader readings that are summed and averaged
+* smoothingSamples7bit: as above
+* newValueThreshold14bit: prevent new MIDI messages from being sent unless this threshold is exceeded by a new value above or below the previous value; this can reduce jitter and compensate for interference
+* newValueThreshold7bit: as above, but is way lower by default since you can't afford to lose too much resolution in 7-bit mode
+* enableDebugMode: when true, debug log output is printed to the serial monitor and can be viewed in Mu or VS Code
+
+
+## Notes:
 
 ### 14-bit Mode
 14-bit MIDI was provided for in the MIDI 1.0 specification, back in the early 1980s. In theory, CC numbers 32 to 63 "are reserved for optional use as the LSB (Least Significant Byte) when higher resolution is required and correspond to 0 through 31 respectively". Most manufacturers and programmers since have ignored this principle, and use 32-63 for whatever they want. But any DAWs and hardware devices which handle 14-bit MIDI properly will recognise consecutive messages on e.g. CC15 and CC47 as being the lower (LSB) and upper (MSB) bytes of a two-byte, 14-bit controller message as opposed to the usual one-byte, 7-bit MIDI CC message.
@@ -79,7 +95,7 @@ The board takes 3.3v and GND from the Pico and also uses pins 16 and 17 for its 
 
 I don't know how liberal some DAWs are in interpreting the o.g. MIDI spec, but it's probably safest to keep faderCCnumbers below 32 since the code simply adds 32 to each CC value to get the other byte's target.
 
-## Notes:
+
 
 ### Faders
 I got my faders from Amazon in the UK, listed as ['sourcing map B103 128mm 10k double potentiometers'](https://www.amazon.co.uk/gp/product/B07W3J5ZVM/); after a bit of detective work, I found that the Bourne datasheet linked above matches these exactly. Perhaps they're licensed, or a knock-off, I'm not sure. 
@@ -91,6 +107,7 @@ I'm sorry, I can't make one for you! When I made Knobber over a decade ago, a lo
 Rudimentary soldering skills and access to a 3D printer (often available cheaply or for free at local maker spaces) should be all you need - although I accept no responsibility if anything goes terribly wrong, causes an accident, causes you to lose money by buying the wrong parts, etc. All the above is what worked for me; your mileage may vary.
 
 ### Technical
+<del>
 The Raspberry Pi Pico has 3 ADC (analogue to digital converter) channels which - allegedly - suffer from some noise at the upper and lower end of their ranges due to the Pico's built in voltage-referencing system. I definitely found jittering throughout and a great amount of it near the top of the faders. 
 
 Jitter's a problem for us  mainly because we get inconsistent values for a given fader position, but also because jittery values create an endless stream of MIDI messages which can really clog up a DAW project's automation fast. 
@@ -99,13 +116,16 @@ I have three techniques for dealing with this:
 1. I compare new CC values against previous values and only send a message if the value has changed beyond a threshold (1 by default) 
 2. At the cost of a tiny amount of latency I take an average of 64 samples from each ADC pin rather than a single read (number of samples can be configured)
 3. I zero the lower 4 bits of the Pico ADCs' 12-bit values in order to get an 8-bit value, which is still more than we need for the 7-bit range (0 to 127) of standard resolution MIDI. It would be cool to try doing 14-bit (or high-res) MIDI, but I'd probably need to use an external 16-bit ADC board rather than 'upscaling' the Pico's 12-bit values... I have some external ADC boards and I'll test this some time.
+</del>
 
 ## Changes / To Do:
 
 ### To do
 * Rotate case before exporting STL
+* Redesign base for ADS1115
 * Implement the sysex config
 * Consider a startup mode to force mass storage - maybe all faders to max when plugging in? 
 
 ### Changes
+* 2024-01-04 14-bit support
 * 2024-01-01 Initial commit
