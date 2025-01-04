@@ -10,10 +10,15 @@ microcontroller.cpu.frequency = 270_000_000
 def clamp(value, min_val, max_val):
     return max(min(value, max_val), min_val)
 
+def mapRange(value, inMin, inMax, outMin, outMax):
+    return outMin + (((value - inMin) / (inMax - inMin)) * (outMax - outMin))
+
 ####################
 ## CONFIG SECTION ##
 ####################
 
+# Selectively enable/disable faders (disabled faders will be ignored)
+faderEnabled = [True, True, True]
 # Each fader can send messages on its own channel. Set them here.
 # (Remember, most DAWs count MIDI channels starting from 1. Here we start from 0.)
 faderMidiChannel = [0, 0, 0]
@@ -23,17 +28,18 @@ faderMidiChannel = [0, 0, 0]
 # should identify these message pairs as a 14-bit control, or at least let you configure the
 # mapping accordingly.
 faderCCNumber = [14, 15, 30]
-# Selectively enable/disable faders (disabled faders will be ignored)
-faderEnabled = [True, True, True]
 # When true, and if an ADS1115 board is found, CCs will be sent as 14bit MIDI pairs
 enable14bitmode = [True, True, True]
+# Optionally scale the output to this range (per fader). In 7-bit mode, max values over 127 
+# will be clamped. In 14-bit mode, max values over 16383 will be clamped. Swap larger and 
+# smaller values to invert the output.
+faderCustomRange = [[0,16383],[0, 16383],[0,16383]]
 # Set the number of ADC samples from which to get a smoothed value.
-# Greater values may reduce jitter.
-smoothingSamples14bit = 2.0
-smoothingSamples7bit = 4.0
+smoothingSamples14bit = [2.0, 2.0, 2.0]
+smoothingSamples7bit = [4.0, 4.0, 4.0]
 # Increasing may reduce jitter, but will also reduce responsiveness/accuracy
-newValueThreshold14bit = 20
-newValueThreshold7bit = 1
+newValueThreshold14bit = [20, 20, 20]
+newValueThreshold7bit = [1, 1, 1]
 # If true, and usb_cdc.disable() is commented out in boot.py, debug messages will be printed 
 # to serial monitor
 enableDebugMode = True
@@ -54,7 +60,7 @@ faderPrevOutput = [0, 0, 0]
 faderADCValue = [0.0, 0.0, 0.0]
 global faders
 
-messageCounter = 0
+messageCounter = [0, 0, 0]
 
 try:
     if enableDebugMode: print ("Checking I2C")
@@ -107,10 +113,10 @@ while True:
                 
                 # Average n reads to reduce jitter
                 faderaverage = 0
-                for i in range(0, int(smoothingSamples14bit)):                    
+                for i in range(0, int(smoothingSamples14bit[f])):                    
                     faderaverage += faders[f].value
 
-                faderADCValue[f] = faderaverage / smoothingSamples14bit
+                faderADCValue[f] = faderaverage / smoothingSamples14bit[f]
 
                 # The effective bit-depth of the ADS1115 is 15, since the 16th is used as 
                 # the sign byte. Plus we lose some resolution in the voltage range we're 
@@ -129,8 +135,13 @@ while True:
 
                 if enable14bitmode[f]:
                 
-                    if abs(faderADCValue[f] - faderPrevOutput[f]) >= newValueThreshold14bit:    
-                        if enableDebugMode: print (f'Count: {messageCounter}' + ' Fader'+str(f) + ' 16bit: ' + str(faders[f].value) \
+                    # First map the value to the custom scale
+                    fadercustommin = clamp(faderCustomRange[f][0], 0, 16382)
+                    fadercustommax = clamp(faderCustomRange[f][1], 1, 16383)                    
+                    faderADCValue[f] = int(mapRange(faderADCValue[f], 0, 16383, fadercustommin, fadercustommax))
+
+                    if abs(faderADCValue[f] - faderPrevOutput[f]) >= newValueThreshold14bit[f]:    
+                        if enableDebugMode: print (f'Count: {messageCounter[f]}' + ' Fader'+str(f) + ' 16bit: ' + str(faders[f].value) \
                                                     + ' 14bit: ' + str(faderADCValue[f]))
                         faderPrevOutput[f] = faderADCValue[f]
                         ccUpper = faderADCValue[f] & 0x7f
@@ -138,7 +149,7 @@ while True:
                     
                         midi[f].send(ControlChange(faderCCNumber[f]+32, ccUpper))
                         midi[f].send(ControlChange(faderCCNumber[f], ccLower))
-                        messageCounter += 1
+                        messageCounter[f] += 1
 
                 else: # send 7-bit messages
                     fader7bitvalue = faderADCValue[f] & 0x7f
@@ -146,7 +157,12 @@ while True:
                     # Just to be safe, let's clamp the output to 7-bit MIDI range
                     fader7bitvalue = clamp(fader7bitvalue, 0, 127)
 
-                    if abs(fader7bitvalue - faderPrevOutput[f]) >= newValueThreshold7bit:    
+                    # First map the value to the custom scale
+                    fadercustommin = clamp(faderCustomRange[f][0], 0, 126)
+                    fadercustommax = clamp(faderCustomRange[f][1], 1, 127)                    
+                    faderADCValue[f] = int(mapRange(faderADCValue[f], 0, 127, fadercustommin, fadercustommax))
+
+                    if abs(fader7bitvalue - faderPrevOutput[f]) >= newValueThreshold7bit[f]:    
                         faderPrevOutput[f] = fader7bitvalue
                         if enableDebugMode: print ('Fader' + str(f) + ' 7bit: ' +str(fader7bitvalue))
 
@@ -157,13 +173,13 @@ while True:
 
                 # Average n reads to reduce jitter
                 faderaverage = 0
-                for i in range(0, int(smoothingSamples14bit)):
+                for i in range(0, int(smoothingSamples14bit[f])):
                     # Zeroing the lower 4 bits mitigates noise in the upper part of Pico's ADC range.
                     # 8bit resolution is adequate for our purposes.
                     reading8bit = (faders[f].value >> 4) << 4
                     faderaverage += reading8bit
 
-                faderADCValue[f] = faderaverage / smoothingSamples14bit
+                faderADCValue[f] = faderaverage / smoothingSamples14bit[f]
 
                 # Convert to MIDI CC range 0-127 if using 7-bit
                 fader7bitvalue = int(faderADCValue[f]/65535 * 127)
@@ -171,9 +187,14 @@ while True:
                 # Just to be safe, let's clamp the output to 7-bit MIDI range
                 fader7bitvalue = clamp(fader7bitvalue, 0, 127)
             
+                # First map the value to the custom scale
+                fadercustommin = clamp(faderCustomRange[f][0], 0, 126)
+                fadercustommax = clamp(faderCustomRange[f][1], 1, 127)                    
+                faderADCValue[f] = int(mapRange(faderADCValue[f], 0, 127, fadercustommin, fadercustommax))
+
                 # If the new value is different to the old one by the threshold amount or greater,
                 # send a CC message.
-                if abs(fader7bitvalue - faderPrevOutput[f]) >= newValueThreshold7bit:
+                if abs(fader7bitvalue - faderPrevOutput[f]) >= newValueThreshold7bit[f]:
                     faderPrevOutput[f] = fader7bitvalue
                     midi[f].send(ControlChange(faderCCNumber[f], fader7bitvalue))
                         

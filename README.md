@@ -89,13 +89,14 @@ If everything's soldered up properly, then you should now be able to replug the 
 
 ## Config options:
 
+* faderEnabled: set True or False to toggle a fader on or off
 * faderMidiChannel (array): set a MIDI channel for each fader separately
 * faderCCNumber: set a CC number for each fader separately
-* faderEnabled: set True or False to toggle a fader on or off
 * enable14bitmode: set True or False to enable 14-bit MIDI mode on each individual fader
+* faderCustomRange: set custom lower and upper range values and output will be scaled accordingly. In 7-bit mode, the lower value will be clamped between 0 and 126 while the upper value will be clamped between 1 and 127. In 14-bit mode, lower value is clamped between 0 and 16382 and upper value is clamped between 1 and 16383. If the lower value is larger than the upper value, output is effectively inverted.
 * smoothingSamples14bit: if you're experiencing jitter, adjusting this value might help. Higher values mean more smoothing but introduce slightly more lag. The value represents the number of fader readings that are summed and averaged
 * smoothingSamples7bit: as above
-* newValueThreshold14bit: prevent new MIDI messages from being sent unless this threshold is exceeded by a new value above or below the previous value; this can reduce jitter and compensate for interference
+* newValueThreshold14bit: prevent new MIDI messages from being sent unless this threshold is exceeded by a new value above or below the previous value; this can reduce jitter and compensate for interference. Remember, if you use a custom range scaling significantly less than default, you'll probably need to reduce this value or else you'll see extremely low resolution: e.g. a custom range of 0-255 in 14-bit mode and a threshold of 20 will jump the value in increments of ~10 with no interpolation. Reducing the threshold to 1 in this instance would solve the problem.
 * newValueThreshold7bit: as above, but is way lower by default since you can't afford to lose too much resolution in 7-bit mode
 * enableDebugMode: when true, debug log output is printed to the serial monitor and can be viewed in Mu or VS Code
 
