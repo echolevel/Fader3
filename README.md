@@ -9,6 +9,22 @@ A 14-bit USB MIDI controller with 3 long-throw (100mm) faders in a compact case.
 
 Fader3 acts as a conventional 7-bit MIDI controller by default, but when an inexpensive external ADC board is added, each fader can individually be set to act as a 14-bit, high resolution MIDI control. This increases the number of possible steps in the control range from 128 to 16,384 and can greatly smooth parameter adjustments, avoiding any audible 'stepping' on things like volume envelopes or filter sweeps.
 
+### Commercially available alternatives (if you don't want to build your own)
+
+I'm aware of similar devices that already exist in this small niche, and for lots of people they'll be perfect. Here are the ones I know of:
+* [EXC-3 USB Expression Controller](https://expressioncontroller.blogspot.com/2021/06/plug-and-play-usb-controller.html?ref=soundonsoundnews)
+* [MIDI-Controller-Modz](https://midi-controller-modz.com/products/3-fader-usb-and-din-midi-with-expression-pedal-input)
+* [The Midi Maker Sparrow](https://themidimaker.com/products/sparrow-3x100mm-midi-47280)
+* [Nuances Controller](https://nuancescontroller.fr/)
+
+Some are quite expensive, some have waiting lists, some are bigger and take up more desk space than I'd like, some have faders that are too short for me, some have buttons and screens that I don't need - but those are all ME problems; they might not be YOU problems! 
+
+They are also handmade in small batches, have good quality control, come with proper documentation and after-sales support, and are all beautifully designed items that'll look and feel good on your work desk.
+
+Unless you're comfortable building DIY electronics projects and dealing with the inevitable faff of solding mistakes, serial connectivity issues and 3D printer hassle, you should probably investigate one of those commercially available devices.
+
+However...it appears that none of them do 14-bit MIDI. So if you really want that functionality, Fader3 might be worth building.
+
 ## Requirements:
 
 ### Hardware
