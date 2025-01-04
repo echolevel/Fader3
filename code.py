@@ -13,15 +13,17 @@ def clamp(value, min_val, max_val):
 
 # Each fader can send messages on its own channel. Set them here.
 # (Remember, most DAWs count MIDI channels starting from 1. Here we start from 0.)
-faderMIDIchannels = [0, 0, 0]
+faderMidiChannel = [0, 0, 0]
 # Configure which CC number each fader should be assigned to. Note: in 14-bit mode, every CC
 # uses the given number + 32 (as per the original MIDI spec, mostly ignored by manufacturers 
 # since it was written). So CC15 in 14-bit mode uses CCs 14 and 47. Spec compliant receivers 
 # should identify these message pairs as a 14-bit control, or at least let you configure the
 # mapping accordingly.
-faderCCnumbers = [14, 15, 30]
+faderCCNumber = [14, 15, 30]
 # Selectively enable/disable faders (disabled faders will be ignored)
 faderEnabled = [True, False, False]
+# When true, and if an ADS1115 board is found, CCs will be sent as 14bit MIDI pairs
+enable14bitmode = [True, True, True]
 # Set the number of ADC samples from which to get a smoothed value.
 # Greater values may reduce jitter.
 smoothingSamples = 24.0
@@ -29,11 +31,9 @@ smoothingSamples = 24.0
 newValueThreshold14bit = 5
 # Increasing may reduce jitter, but will also reduce responsiveness/accuracy
 newValueThreshold7bit = 1
-# When true, and if an ADS1115 board is found, CCs will be sent as 14bit MIDI pairs
-enable14bitmode = True
 # If true, and usb_cdc.disable() is commented out in boot.py, debug messages will be printed 
 # to serial monitor
-debugModeEnabled = True
+enableDebugMode = True
 
 ########################
 ## CONFIG SECTION END ##
@@ -44,18 +44,18 @@ debugModeEnabled = True
 ## Don't touch these ##
 #######################
 i2cFound = False
-midi = [adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=faderMIDIchannels[0]),\
-        adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=faderMIDIchannels[1]),\
-        adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=faderMIDIchannels[2])]
+midi = [adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=faderMidiChannel[0]),\
+        adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=faderMidiChannel[1]),\
+        adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=faderMidiChannel[2])]
 faderPrevOutput = [0, 0, 0]
 faderADCValue = [0.0, 0.0, 0.0]
 global faders
 
 
 try:
-    if debugModeEnabled: print ("Checking I2C")
+    if enableDebugMode: print ("Checking I2C")
     i2c = busio.I2C(board.GP17, board.GP16, frequency=1000000)
-    if debugModeEnabled: print ("Found I2C")
+    if enableDebugMode: print ("Found I2C")
     import adafruit_ads1x15.ads1115 as ADS
 
     from adafruit_ads1x15.analog_in import AnalogIn
@@ -77,8 +77,8 @@ try:
 
     i2cFound = True
 except Exception as e:
-    if debugModeEnabled: print ("Failed: ", e)
-    if debugModeEnabled: print ("Fader3 will run in 7-bit MIDI mode since no ADS1115 breakout \
+    if enableDebugMode: print ("Failed: ", e)
+    if enableDebugMode: print ("Fader3 will run in 7-bit MIDI mode since no ADS1115 breakout \
                                 board was found.")
     enable14bitmode = False
     faders = [analogio.AnalogIn(board.A0),analogio.AnalogIn(board.A1),analogio.AnalogIn(board.A2)]
@@ -110,20 +110,20 @@ while True:
 
                 faderADCValue[f] = faderADCValue[f] & 0x3FFF # Mask to 14bit
 
-                # Just t o be safe, let's clamp the output to 14-bit MIDI range
+                # Just to be safe, let's clamp the output to 14-bit MIDI range
                 faderADCValue[f] = clamp(faderADCValue[f], 0, 16383)
 
-                if enable14bitmode:
+                if enable14bitmode[f]:
                 
                     if abs(faderADCValue[f] - faderPrevOutput[f]) >= newValueThreshold14bit:    
-                        if debugModeEnabled: print ('Fader'+str(f) + ' 16bit: ' + str(faders[f].value) \
+                        if enableDebugMode: print ('Fader'+str(f) + ' 16bit: ' + str(faders[f].value) \
                                                     + ' 14bit: ' + str(faderADCValue[f]))
                         faderPrevOutput[f] = faderADCValue[f]
                         ccUpper = faderADCValue[f] & 0x7f
                         ccLower = (faderADCValue[f] >> 7) & 0x7f
                     
-                        midi[f].send(ControlChange(faderCCnumbers[f]+32, ccUpper))
-                        midi[f].send(ControlChange(faderCCnumbers[f], ccLower))
+                        midi[f].send(ControlChange(faderCCNumber[f]+32, ccUpper))
+                        midi[f].send(ControlChange(faderCCNumber[f], ccLower))
 
                 else: # send 7-bit messages
                     fader7bitvalue = faderADCValue[f] & 0x7f
@@ -133,9 +133,9 @@ while True:
 
                     if abs(fader7bitvalue - faderPrevOutput[f]) >= newValueThreshold7bit:    
                         faderPrevOutput[f] = fader7bitvalue
-                        if debugModeEnabled: print ('Fader' + str(f) + ' 7bit: ' +str(fader7bitvalue))
+                        if enableDebugMode: print ('Fader' + str(f) + ' 7bit: ' +str(fader7bitvalue))
 
-                        midi[f].send(ControlChange(faderCCnumbers[f], fader7bitvalue))
+                        midi[f].send(ControlChange(faderCCNumber[f], fader7bitvalue))
                         
                     
             else: # no external ADC found, so we'll use the Pico's onboard ADC
@@ -160,6 +160,6 @@ while True:
                 # send a CC message.
                 if abs(fader7bitvalue - faderPrevOutput[f]) >= newValueThreshold7bit:
                     faderPrevOutput[f] = fader7bitvalue
-                    midi[f].send(ControlChange(faderCCnumbers[f], fader7bitvalue))
+                    midi[f].send(ControlChange(faderCCNumber[f], fader7bitvalue))
                         
     #sleep(0.01)

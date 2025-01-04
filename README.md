@@ -1,7 +1,7 @@
 # Fader3
  3-fader USB MIDI controller
 
-![photo of Fader3 on my desk; also my computer keyboard, my MIDI piano keyboard, and some tools used to finish the Fader3 case](hero_shot.jpg)
+[<img src="hero_shot.jpg" width="300px"/>](hero_shot.jpg)
 
 ## Project Spec
 
@@ -58,6 +58,26 @@ Into the libs directory, place the adafruit_midi directory and its contents from
 Now drag adafruit_midi into the CIRCUITPY\libs directory, and code.py and boot.py into the CIRCUITPY root.
 
 If everything's soldered up properly, then you should now be able to replug the device and see a new MIDI device called 'CircuitPython Audio', with CC commands appearing on the specified numbers.
+
+### Using ADS1115 as external ADC:
+[<img src="schematic_external_adc.jpg" width="300px"/>](schematic_external_adc.jpg)
+
+### Using Pico's internal ADC:
+[<img src="schematic_internal_adc.jpg" width="300px"/>](schematic_internal_adc.jpg)
+
+
+### 14-bit Mode
+14-bit MIDI was provided for in the MIDI 1.0 specification, back in the early 1980s. In theory, CC numbers 32 to 63 "are reserved for optional use as the LSB (Least Significant Byte) when higher resolution is required and correspond to 0 through 31 respectively". Most manufacturers and programmers since have ignored this principle, and use 32-63 for whatever they want. But any DAWs and hardware devices which handle 14-bit MIDI properly will recognise consecutive messages on e.g. CC15 and CC47 as being the lower (LSB) and upper (MSB) bytes of a two-byte, 14-bit controller message as opposed to the usual one-byte, 7-bit MIDI CC message.
+
+Why use it? Sometimes you want a really smooth control change, and especially with long-throw faders like these, it's nice to get very fine control over fractions of a dB, or precise filter cutoff frequencies, and so on. With 7-bit MIDI you may end up wasting a lot of that extra physical resolution and, worst case, hear 'stepping' as values change in the 0-127 range. 14-bit CCs go from 0 to 16383, so that ceases to be an issue.
+
+Since the Raspberry Pi Pico has a 12-bit ADC which isn't terribly accurate, particularly at the upper end of its range (due - apparently - to an unreliable voltage reference source), we can use a very cheap, compact and accurate external ADC chip called the ADS1115 which has 16-bit resolution (effectively 15-bit, since the 16th is used as a sign bit), 4 channels, and an excellent CircuitPython library from adafruit. 
+
+As with the MIDI library, this will need to be [downloaded](https://github.com/adafruit/Adafruit_CircuitPython_ADS1x15/releases/download/2.4.1/adafruit-circuitpython-ads1x15-9.x-mpy-2.4.1.zip) and the lib\adafruit_ads1x15 directory and contents placed in the Pico's lib directory.
+
+The board takes 3.3v and GND from the Pico and also uses pins 16 and 17 for its SDA and SDL pins (clock and data lines). The code checks for its presence; if it's not found, it falls back to using the Pico's ADC pins in 7-bit. If found, you can use 14-bit or 7-bit and some config options - for smoothing and so on - can be set separately for each mode. 
+
+I don't know how liberal some DAWs are in interpreting the o.g. MIDI spec, but it's probably safest to keep faderCCnumbers below 32 since the code simply adds 32 to each CC value to get the other byte's target.
 
 ## Notes:
 
