@@ -1,21 +1,13 @@
 # Fader3
  3-fader USB MIDI controller
 
-[<img src="hero_shot.jpg" width="300px"/>](hero_shot.jpg)
+![photo of Fader3 on a desk](hero_shot.jpg)
 
 ## Project Spec
 
-I wanted a USB MIDI controller consisting of only 3 faders, and while they needed to be the longest-throw faders possible, I also wanted the device to take up as little space on my desk as possible - in height as well as width and depth.
+A 14-bit USB MIDI controller with 3 long-throw (100mm) faders in a compact case. There are no buttons or display screens, in order to keep the desk footprint as small as possible: 6.7cm wide, 13.6cm deep and 2.5cm high.
 
-![TinkerCAD view of the case design](Case_Perspective.jpg)
-
-Like a lot of composers, I control expression and dynamics of software instruments such as orchestral sample libraries using some kind of hardware control with one hand, while playing notes on a keyboard using the other. 
-
-And because I also do a lot of audio post, dialogue editing and dubbing mixes, I wanted another fader that I could arbitrarily map to gain stage controls on a per-track basis in my DAW - this is essential for recording large amounts of volume automation in an efficient way. 
-
-Very nice devices of this type are commercially available, but they often have cases that are a bit too large for my tastes - usually due to having LCD displays and/or buttons for extra functionality. I'd rather save the desk space and use raw SYSEX messages to change setting when (rarely) necessary.
-
-![TinkerCAD view of the case design](Case_Parts.jpg)
+Fader3 acts as a conventional 7-bit MIDI controller by default, but when an inexpensive external ADC board is added, each fader can individually be set to act as a 14-bit, high resolution MIDI control. This increases the number of possible steps in the control range from 128 to 16,384 and can greatly smooth parameter adjustments, avoiding any audible 'stepping' on things like volume envelopes or filter sweeps.
 
 ## Requirements:
 
@@ -29,6 +21,7 @@ Very nice devices of this type are commercially available, but they often have c
 ### Software
 * CircuitPython UF2 from [here](https://circuitpython.org/downloads)
 * Mu editor [via these instructions](https://learn.adafruit.com/getting-started-with-raspberry-pi-pico-circuitpython/installing-mu-editor)
+* OR Visual Studio Code with the [CircuitPython v2 extension](https://marketplace.visualstudio.com/items?itemName=wmerkens.vscode-circuitpython-v2)
 
 
 ## Instructions:
@@ -37,9 +30,13 @@ Print the case and the base from the supplied STL files.
 
 Note that the case has a 0.2mm layer over the top: this is not a mistake. Firstly it helps the printer lay down the bolt holes and fader slots if you're having any trouble with adhesion; secondly it gives a nice finish to the top surface. 
 
+![TinkerCAD view of the case design](Case_Perspective.jpg)
+
 You'll have to cut through the slot and bolt holes. I recommend starting the bolt holes with an awl, then drilling through with a 3mm bit in a pin vice (small unpowered hobby drill), and finishing with a needle file until M3 bolts pass through comfortably. Holding the case up to a light shows where the holes are.
 
 Similar for the slots: use a sharp knife to slowly puncture the end of each slot and drag down carefully. A steel rule will help avoid veering off and cutting into the main body of the case. When they're all cut, a ~2mm emery board or sanding stick should be used in each slot until the fader can fit through and slide up and down unimpeded.
+
+![TinkerCAD view of the case design](Case_Parts.jpg)
 
 The Pi Pico sits in the base, and the micro USB socket should line up nicely with the case top. It's advisable to bolt down the Pico - M2 bolts should be used, with appropriate holes drilled through the base (the pin vice again!). M2*6 bolts with M2 nuts on the underside should work, and won't scrape your desk since you'll be sticking rubber feet on all four corners of the base.
 
@@ -47,23 +44,28 @@ Rubber feet: buy a selection pack of 3M sticky feet for a few quid - they'll com
 
 Once the faders are in the slots, bolt them down from the top with M3*6 bolts. Countersunk bolts are best; panhead bolts might catch on the fader caps. You might want to countersink the holes a little, but since my design incorporates some degree of countersinking _under_ the top 0.2mm layer, just tightening them up should sink them into the surface of the case sufficiently.
 
-The Pico will need to distribute 3.3v and GND to each fader's 1 and 3 pins in parallel, not in series. I've made up wires that split 1 into 3 for both of these. Finally, the Pico's analogue pins A0, A1 and A2 need to be connected to pin 2 of each fader.
+The ADS1115 board needs 3.3v and GND from the Pico, and also SDA and SDL from pins GP16 and GP17 respectively. Then each fader will also need 3.3v and GND on pins 1 and 3, while pin 2 (the wiper contact) should be connected to the ADS1115's ADC channels: 0, 1 and 2.
+
+If you're not using the ADS1115, the faders' wiper pins instead go to the Pico's analogue pins A0, A1 and A2.
 
 The first time you plug in a new Pico, you'll see a mass storage device appear. The circuitpython firmware UF2 from adafruit should be dragged into this device, which will cause the Pico's bootloader to be overwritten. When it's replugged, you should see another mass storage device: CIRCUITPY. This is where you'll be putting boot.py and code.py. 
 
 But first, edit code.py to set up some values - CC numbers, channel, etc. Mu Editor might be a good choice for making these changes, since it's set up with some contextual help for Micropython/Circuitpython.
 
-Into the libs directory, place the adafruit_midi directory and its contents from [here](https://github.com/adafruit/Adafruit_CircuitPython_MIDI).
+Into the libs directory, place the adafruit_midi directory and its contents from:
+ [https://github.com/adafruit/Adafruit_CircuitPython_MIDI](https://github.com/adafruit/Adafruit_CircuitPython_MIDI). 
+ 
+ Do the same with the adafruit_ads1x15 directory and its contents from: [https://github.com/adafruit/Adafruit_CircuitPython_ADS1x15/releases/download/2.4.1/adafruit-circuitpython-ads1x15-9.x-mpy-2.4.1.zip](https://github.com/adafruit/Adafruit_CircuitPython_ADS1x15/releases/download/2.4.1/adafruit-circuitpython-ads1x15-9.x-mpy-2.4.1.zip).
 
 Now drag adafruit_midi into the CIRCUITPY\libs directory, and code.py and boot.py into the CIRCUITPY root.
 
-If everything's soldered up properly, then you should now be able to replug the device and see a new MIDI device called 'CircuitPython Audio', with CC commands appearing on the specified numbers.
+If everything's soldered up properly, then you should now be able to replug the device and see a new MIDI device called 'CircuitPython Audio' with CC commands appearing on the specified numbers.
 
 ### Using ADS1115 as external ADC:
-[<img src="schematic_external_adc.jpg" width="300px"/>](schematic_external_adc.jpg)
+[<img src="schematic_external_adc.jpg" width="600px"/>](schematic_external_adc.jpg)
 
 ### Using Pico's internal ADC:
-[<img src="schematic_internal_adc.jpg" width="300px"/>](schematic_internal_adc.jpg)
+[<img src="schematic_internal_adc.jpg" width="600px"/>](schematic_internal_adc.jpg)
 
 
 ### 14-bit Mode
@@ -72,8 +74,6 @@ If everything's soldered up properly, then you should now be able to replug the 
 Why use it? Sometimes you want a really smooth control change, and especially with long-throw faders like these, it's nice to get very fine control over fractions of a dB, or precise filter cutoff frequencies, and so on. With 7-bit MIDI you may end up wasting a lot of that extra physical resolution and, worst case, hear 'stepping' as values change in the 0-127 range. 14-bit CCs go from 0 to 16383, so that ceases to be an issue.
 
 Since the Raspberry Pi Pico has a 12-bit ADC which isn't terribly accurate, particularly at the upper end of its range (due - apparently - to an unreliable voltage reference source), we can use a very cheap, compact and accurate external ADC chip called the ADS1115 which has 16-bit resolution (effectively 15-bit, since the 16th is used as a sign bit), 4 channels, and an excellent CircuitPython library from adafruit. 
-
-As with the MIDI library, this will need to be [downloaded](https://github.com/adafruit/Adafruit_CircuitPython_ADS1x15/releases/download/2.4.1/adafruit-circuitpython-ads1x15-9.x-mpy-2.4.1.zip) and the lib\adafruit_ads1x15 directory and contents placed in the Pico's lib directory.
 
 The board takes 3.3v and GND from the Pico and also uses pins 16 and 17 for its SDA and SDL pins (clock and data lines). The code checks for its presence; if it's not found, it falls back to using the Pico's ADC pins in 7-bit. If found, you can use 14-bit or 7-bit and some config options - for smoothing and so on - can be set separately for each mode. 
 
@@ -104,8 +104,6 @@ I have three techniques for dealing with this:
 
 ### To do
 * Rotate case before exporting STL
-* Improve base so it extends the full length while still allowing Pico to be flush
-* Maybe clarify some stuff with the code
 * Implement the sysex config
 * Consider a startup mode to force mass storage - maybe all faders to max when plugging in? 
 
