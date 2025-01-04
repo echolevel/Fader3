@@ -17,6 +17,8 @@ def mapRange(value, inMin, inMax, outMin, outMax):
 ## CONFIG SECTION ##
 ####################
 
+## TO DO - add some sysex config guff, like I did with Knobber a thousand years ago.
+
 # Selectively enable/disable faders (disabled faders will be ignored)
 faderEnabled = [True, True, True]
 # Each fader can send messages on its own channel. Set them here.
