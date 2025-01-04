@@ -5,7 +5,7 @@
 
 ## Project Spec
 
-A 14-bit USB MIDI controller with 3 long-throw (100mm) faders in a compact case. There are no buttons or display screens, in order to keep the desk footprint as small as possible: 6.7cm wide, 13.6cm deep and 2.5cm high.
+A 14-bit USB MIDI controller with 3 long-throw (100mm) faders in a compact case. There are no buttons or display screens, in order to keep the desk footprint as SMALL as possible: 6.7cm wide, 13.6cm deep and 2.5cm high.
 
 Fader3 acts as a conventional 7-bit MIDI controller by default, but when an inexpensive external ADC board is added, each fader can individually be set to act as a 14-bit, high resolution MIDI control. This increases the number of possible steps in the control range from 128 to 16,384 and can greatly smooth parameter adjustments, avoiding any audible 'stepping' on things like volume envelopes or filter sweeps.
 
@@ -16,6 +16,8 @@ I'm aware of similar devices that already exist in this small niche, and for lot
 * [MIDI-Controller-Modz](https://midi-controller-modz.com/products/3-fader-usb-and-din-midi-with-expression-pedal-input)
 * [The Midi Maker Sparrow](https://themidimaker.com/products/sparrow-3x100mm-midi-47280)
 * [Nuances Controller](https://nuancescontroller.fr/)
+* [AMC3 - 3  Fader MIDI Controller](https://amc3midicontrollers.com/products/AMC3-3-Fader-MIDI-Controller-p418478715)
+* if you know of any more, please let me know and I'll add them
 
 Some are quite expensive, some have waiting lists, some are bigger and take up more desk space than I'd like, some have faders that are too short for me, some have buttons and screens that I don't need - but those are all ME problems; they might not be YOU problems! 
 
@@ -23,7 +25,7 @@ They are also handmade in small batches, have good quality control, come with pr
 
 Unless you're comfortable building DIY electronics projects and dealing with the inevitable faff of solding mistakes, serial connectivity issues and 3D printer hassle, you should probably investigate one of those commercially available devices.
 
-However...it appears that none of them do 14-bit MIDI. So if you really want that functionality, Fader3 might be worth building.
+However...it appears that none of the above do 14-bit MIDI. So if you really want that functionality, Fader3 might be worth building.
 
 ## Requirements:
 
