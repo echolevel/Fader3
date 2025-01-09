@@ -22,6 +22,20 @@
 
 #include "RtMidi.h"
 
+#if defined (_WIN32)
+// This lets us write output to a console IF the app was started from a console.
+void InitConsoleOutput()
+{
+	if (AttachConsole(ATTACH_PARENT_PROCESS) || AllocConsole())
+	{
+		FILE* fp;
+		freopen_s(&fp, "CONOUT$", "w", stdout);
+		freopen_s(&fp, "CONOUT$", "w", stderr);
+	}
+}
+#else
+void InitConsoleOutput(){}
+#endif
 
 std::string getExecutableDirectory()
 {
@@ -229,12 +243,8 @@ void SyncWindowSizeWithImGui(GLFWwindow* glfwWindow) {
 }
 
 
-static bool isDragging = false;
-static bool isMenuHovered = false;
-static ImVec2 dragStartPos;
-
-int width = 320;
-int height = 400;
+int width = 330;
+int height = 480;
 
 float baseFontSize = 13.0f;
 float iconFontSize = baseFontSize;
@@ -514,11 +524,40 @@ inline float mapToRange(const float x, const float in_min, const float in_max, c
 
 
 
-int main() {
+int main(int argc, char** argv) {
 	if (!glfwInit()) {
 		std::cerr << "Failed to initialize GLFW" << std::endl;
 		return -1;
 	}
+
+	bool use_default_settings = false;
+	
+	//InitConsoleOutput();
+	// Handle command line flags
+	try
+	{
+		for (int i = 1; i < argc; i++)
+		{
+			std::string arg = argv[i];
+			if (arg == "--defaults")
+			{
+				use_default_settings = true;
+			}
+			else if (arg == "?" || arg == "-h" || arg == "--help")
+			{				
+				std::cout << "Use '--defaults' to run Fader3 Editor with its default settings, or you could just delete the fader3settings.ini file" << std::endl;
+				exit(1);
+			}
+		}
+	}
+	catch (const std::exception& e)
+	{
+		// Catch exceptions from std::stoi or invalid argument handling
+		std::cerr << "Error parsing arguments: " << e.what() << std::endl;
+		std::cerr << "Usage: " << argv[0] << " [--defaults]" << std::endl;
+		exit(1);
+	}
+	
 
 	// Create a GLFW window
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -537,16 +576,18 @@ int main() {
 		return -1;
 	}
 	glfwMakeContextCurrent(window);
-	glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+	//glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
 	glfwSetMouseButtonCallback(window, MouseButtonCallback);
 	glfwSetWindowCloseCallback(window, WindowCloseCallback);
 	glfwSetKeyCallback(window, KeyCallback);
 	glfwSetCursorPosCallback(window, CursorPosCallback);
-
-	const std::string iniFileName = "fader3settings.ini";
+	
+	const std::string iniFileName = use_default_settings ? "" : "fader3settings.ini";
 	std::unordered_map<std::string, std::string> pairs;
 	readAppSettings(iniFileName, pairs);
+	
+	
 	
 	findConfigValue("width", pairs, &width, nullptr);
 	findConfigValue("height", pairs, &height, nullptr);
@@ -608,9 +649,13 @@ int main() {
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
 
+	// Disable imgui's ini, since we're handling window size/pos ourselves and the true values aren't written to it
+	io.IniFilename = NULL;
+
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
-	SetBessTheme();
+	//SetBessTheme();
+	SetupImGuiStyle();
 
 	setupImGuiFonts();
 
@@ -618,20 +663,19 @@ int main() {
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	ImGui_ImplOpenGL3_Init("#version 460");
 
-	
+	static bool isDragging = false;
+	static bool isMenuHovered = false;
+	static bool dragStartedOnTitlebar = false;
+	static ImVec2 dragStartPos;
 
 	// Main loop
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
-		
-
 		// Start ImGui frame
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
 		ImGui::NewFrame();
-
-		
 
 		// Starting mouse position
 		static double dragStartX;
@@ -648,29 +692,37 @@ int main() {
 		static double cursorY;
 		glfwGetCursorPos(window, &cursorX, &cursorY);
 
+		if (ImGui::IsMouseClicked(0))
+		{
+			if (ImGui::GetMousePos().y < ImGui::GetFrameHeight())
+			{
+				dragStartedOnTitlebar = true;
+			}
+		}
+
 		if (ImGui::GetMousePos().y < ImGui::GetFrameHeight())
 		{
-			isMenuHovered = true;
+			isMenuHovered = true;			
 		}
 		else if (!isDragging)
 		{
-			isMenuHovered = false;
+			//isMenuHovered = false;
 		}
 
 		if (ImGui::IsMouseDragging(ImGuiMouseButton_Left))
 		{
-			if (isMenuHovered)
-			{
+			if (isMenuHovered && dragStartedOnTitlebar)
+			{				
 				if (!isDragging)
 				{
 					// Start dragging
 					isDragging = true;
 
 					// Save the initial mouse position
-					dragStartPos = ImVec2(cursorX, cursorY);
+					dragStartPos = ImVec2((float)cursorX, (float)cursorY);
 
 					// Save the initial window position
-					glfwGetWindowPos(window, &windowStartX, &windowStartX);
+					glfwGetWindowPos(window, &windowStartX, &windowStartX);					
 				}
 
 				// Calculate the new position based on the total mouse movement
@@ -687,21 +739,25 @@ int main() {
 		{
 			// Stop dragging
 			isDragging = false;
-			isMenuHovered = false;
+			isMenuHovered = false;			
+		}
+
+		if (!ImGui::IsMouseDown(0))
+		{
+			dragStartedOnTitlebar = false;
 		}
 
 		ImGuiViewport* viewport = ImGui::GetMainViewport();
 		ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x - 1, viewport->Pos.y));		
-		
+		ImGui::SetNextWindowSize(ImVec2(width, height));
 
 		static bool window_open = true;
 		if (!window_open)
 		{
 			glfwSetWindowShouldClose(window, true);
 		}
-		if(ImGui::Begin("Fader3 Editor", &window_open, ImGuiWindowFlags_NoCollapse))
-		{
-
+		if(ImGui::Begin("Fader3 Editor", &window_open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize))
+		{			
 			if (!fader3->MidiInNames.empty())
 			{
 				
@@ -987,7 +1043,7 @@ int main() {
 			static ImGuiInputTextFlags flags = ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_NoHorizontalScroll;
 
 			std::string multilines;
-			for (int i = fader3->MidiLogs.size() - 1; i > 0; i--)
+			for (int i = (int)fader3->MidiLogs.size() - 1; i > 0; i--)
 			{
 				if (i >= LINESMAX) continue;
 
