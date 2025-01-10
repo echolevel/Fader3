@@ -45,6 +45,9 @@
     <ClCompile Include="RtMidi.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Fader3Config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Fader3Config.h">

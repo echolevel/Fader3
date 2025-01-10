@@ -1,5 +1,6 @@
 #pragma once
-
+#include <imgui.h>
+#include "imgui_internal.h"
 #include <iostream>
 #include <cstdlib>
 #include <vector>
@@ -9,9 +10,12 @@
 #include <sstream>
 #include <iomanip>
 #include <string>
+#include <unordered_map>
 
 #define LINEBUFFERMAX 192
 #define LINESMAX 16
+
+struct GLFWwindow;
 
 struct Fader3Settings {
     int chan[3] = { 1, 1, 1 };
@@ -57,28 +61,74 @@ struct Fader3Settings {
 class Fader3 {
 
 public:
-    Fader3()
-    {};
+    Fader3();
+
+	~Fader3();
+
+	// Setup RtMidi
+	RtMidiIn* midiin = new RtMidiIn();
+	RtMidiOut* midiout = new RtMidiOut();
 
     Fader3Settings *settings = new Fader3Settings();
+
+	int width;
+	int height;
+
+	// ImGui globals
+	char inputStatus[32] = "Inactive";
+	char outputStatus[32] = "Inactive";
+
+	float baseFontSize = 13.0f;
+	float iconFontSize = baseFontSize;
+
+	bool isDragging = false;
+	bool isMenuHovered = false;
+	bool dragStartedOnTitlebar = false;
+	ImVec2 dragStartPos;
+
+	ImFont* iconFont;
 
     std::vector<std::string> MidiInNames;
     std::vector<std::string> MidiOutNames;
     std::vector<std::string> MidiLogs;
 
-    unsigned int MidiInIndex = 0;
-    unsigned int MidiOutIndex = 0;
+    unsigned int MidiInIndex;
+    unsigned int MidiOutIndex;
 
     std::vector<unsigned char> IncomingMidiMessage;
     int MidiInNBytes;
     double stamp;
 
     // Cache previous channel and CC num to detect 14-bit messages
-    int lastChannel = 0;
-    int lastCCnum = 0;
-    int lastCCvalue = 0;
+    int lastChannel;
+    int lastCCnum;
+    int lastCCvalue;
 
-    bool scrollToBottom = false;
+	// Main ImGui draw window
+	void Update(GLFWwindow* window);
+
+	// File IO for settings ini
+	std::string getExecutableDirectory();
+
+	void writeAppSettings(const std::string& fileName, const std::unordered_map<std::string, std::string>& keyValuePairs);
+
+	void readAppSettings(const std::string& fileName, std::unordered_map<std::string, std::string>& keyValuePairs);
+
+	void findConfigValue(const std::string keyname, std::unordered_map<std::string, std::string>& configPairsLoading, int* outputint = nullptr, std::string* outputstring = nullptr);
+
+	// This is how we subordinate the glfw window to our main/sole ImGui window
+	void SyncWindowSizeWithImGui(GLFWwindow* glfwWindow);
+
+	void setupImGuiFonts();
+
+	// Flush out and renew our lists of discovered input and output MIDI ports
+	int refreshMidiPorts();
+
+	int openMidiInPort(int InIndex);
+
+	int openMidiOutPort(int OutIndex);
+
+	void releaseMidiPorts(char* inputStatus, char* outputStatus);
 
     void SendMessageOnPort(const std::vector<unsigned char>* OutMsg, RtMidiOut* OutInstance)
     {
@@ -102,36 +152,12 @@ public:
     }
 
     // Add a log line to the log output text view
-    void Log(const char* fmt){     
-        std::time_t now = std::time(nullptr);
-        std::tm localTime;
-        localtime_s(&localTime, &now);
-
-        std::ostringstream timestamp;
-        timestamp << "[" << std::setfill('0') << std::setw(2) << localTime.tm_hour << ":"
-                  << std::setfill('0') << std::setw(2) << localTime.tm_min << ":" 
-                  << std::setfill('0') << std::setw(2) << localTime.tm_sec << "] ";
-        
-        std::string timestampedFmt = timestamp.str() + fmt;
-        const char* finalFMt = timestampedFmt.c_str();
-
-        char buffer[LINEBUFFERMAX];
-        snprintf(buffer, sizeof(buffer), finalFMt);
-        buffer[sizeof(buffer) - 1] = 0; // Ensure null-termination
-        MidiLogs.push_back(buffer);
-        scrollToBottom = true;
-
-        // Lose surplus lines
-        if (MidiLogs.size() > LINESMAX)
-        {
-            MidiLogs.erase(MidiLogs.begin(), MidiLogs.begin() + (MidiLogs.size() - LINESMAX));
-        }
-    }
+    void Log(const char* fmt);
 
 };
 
 // Bess Dark Theme - https://github.com/shivang51/bess/blob/main/Bess/src/settings/themes.cpp
-void SetBessTheme()
+static void SetBessTheme()
 {
 	ImGuiStyle& style = ImGui::GetStyle();
 	ImVec4* colors = style.Colors;
@@ -212,7 +238,7 @@ void SetBessTheme()
 	style.AntiAliasedFill = true;  // Enable anti-aliased fill
 }
 
-void SetupImGuiStyle()
+static void SetupImGuiStyle()
 {
 	// Visual Studio style by MomoDeve from ImThemes
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -301,4 +327,95 @@ void SetupImGuiStyle()
 	style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.0f, 1.0f, 1.0f, 0.699999988079071f);
 	style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.800000011920929f, 0.800000011920929f, 0.800000011920929f, 0.2000000029802322f);
 	style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.1450980454683304f, 0.1450980454683304f, 0.1490196138620377f, 1.0f);
+}
+
+static void Fader3ImGuiStyle()
+{
+	// Fader3 style from ImThemes
+	ImGuiStyle& style = ImGui::GetStyle();
+
+	style.Alpha = 1.0f;
+	style.DisabledAlpha = 0.6000000238418579f;
+	style.WindowPadding = ImVec2(8.0f, 8.0f);
+	style.WindowRounding = 6.0f;
+	style.WindowBorderSize = 0.0f;
+	style.WindowMinSize = ImVec2(32.0f, 32.0f);
+	style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
+	style.WindowMenuButtonPosition = ImGuiDir_Left;
+	style.ChildRounding = 4.0f;
+	style.ChildBorderSize = 1.0f;
+	style.PopupRounding = 4.0f;
+	style.PopupBorderSize = 1.0f;
+	style.FramePadding = ImVec2(4.0f, 4.0f);
+	style.FrameRounding = 4.0f;
+	style.FrameBorderSize = 0.0f;
+	style.ItemSpacing = ImVec2(8.0f, 8.0f);
+	style.ItemInnerSpacing = ImVec2(4.0f, 4.0f);
+	style.CellPadding = ImVec2(4.0f, 2.0f);
+	style.IndentSpacing = 21.0f;
+	style.ColumnsMinSpacing = 6.0f;
+	style.ScrollbarSize = 14.0f;
+	style.ScrollbarRounding = 7.0f;
+	style.GrabMinSize = 10.0f;
+	style.GrabRounding = 4.0f;
+	style.TabRounding = 4.0f;
+	style.TabBorderSize = 0.0f;
+	style.TabMinWidthForCloseButton = 0.0f;
+	style.ColorButtonPosition = ImGuiDir_Right;
+	style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
+	style.SelectableTextAlign = ImVec2(0.0f, 0.0f);
+
+	style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+	style.Colors[ImGuiCol_TextDisabled] = ImVec4(0.4980392158031464f, 0.4980392158031464f, 0.4980392158031464f, 1.0f);
+	style.Colors[ImGuiCol_WindowBg] = ImVec4(0.08587377518415451f, 0.0898594930768013f, 0.09012877941131592f, 0.9399999976158142f);
+	style.Colors[ImGuiCol_ChildBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+	style.Colors[ImGuiCol_PopupBg] = ImVec4(0.08627451211214066f, 0.09019608050584793f, 0.09019608050584793f, 0.9411764740943909f);
+	style.Colors[ImGuiCol_Border] = ImVec4(0.4274509847164154f, 0.4274509847164154f, 0.4980392158031464f, 0.5f);
+	style.Colors[ImGuiCol_BorderShadow] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+	style.Colors[ImGuiCol_FrameBg] = ImVec4(0.3131205141544342f, 0.3704493343830109f, 0.3819742202758789f, 0.4334763884544373f);
+	style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.2065611779689789f, 0.5106505155563354f, 0.540772557258606f, 0.4000000059604645f);
+	style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.2265283912420273f, 0.5589003562927246f, 0.6137338876724243f, 0.6700000166893005f);
+	style.Colors[ImGuiCol_TitleBg] = ImVec4(0.03921568766236305f, 0.03921568766236305f, 0.03921568766236305f, 1.0f);
+	style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.1934461891651154f, 0.2232042700052261f, 0.2532188892364502f, 1.0f);
+	style.Colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.0f, 0.0f, 0.0f, 0.5099999904632568f);
+	style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.1372549086809158f, 0.1372549086809158f, 0.1372549086809158f, 1.0f);
+	style.Colors[ImGuiCol_ScrollbarBg] = ImVec4(0.01960784383118153f, 0.01960784383118153f, 0.01960784383118153f, 0.5299999713897705f);
+	style.Colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.3098039329051971f, 0.3098039329051971f, 0.3098039329051971f, 1.0f);
+	style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.407843142747879f, 0.407843142747879f, 0.407843142747879f, 1.0f);
+	style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.5098039507865906f, 0.5098039507865906f, 0.5098039507865906f, 1.0f);
+	style.Colors[ImGuiCol_CheckMark] = ImVec4(0.5315994024276733f, 0.6251309514045715f, 0.6695278882980347f, 1.0f);
+	style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.8540772199630737f, 0.7731353640556335f, 0.3152388036251068f, 1.0f);
+	style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.2599999904632568f, 0.5899999737739563f, 0.9800000190734863f, 1.0f);
+	style.Colors[ImGuiCol_Button] = ImVec4(0.2838512659072876f, 0.4363551139831543f, 0.5751073360443115f, 0.4000000059604645f);
+	style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.370793342590332f, 0.4447116553783417f, 0.4721029996871948f, 1.0f);
+	style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.3191254138946533f, 0.421858012676239f, 0.45064377784729f, 1.0f);
+	style.Colors[ImGuiCol_Header] = ImVec4(0.4060859382152557f, 0.5073120594024658f, 0.6266094446182251f, 0.3100000023841858f);
+	style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.350770890712738f, 0.4596557021141052f, 0.5879828333854675f, 0.800000011920929f);
+	style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.2613789141178131f, 0.7081544995307922f, 0.7024021148681641f, 1.0f);
+	style.Colors[ImGuiCol_Separator] = ImVec4(0.4274509847164154f, 0.4274509847164154f, 0.4980392158031464f, 0.5f);
+	style.Colors[ImGuiCol_SeparatorHovered] = ImVec4(0.4446204900741577f, 0.5350115895271301f, 0.6394850015640259f, 0.7799999713897705f);
+	style.Colors[ImGuiCol_SeparatorActive] = ImVec4(0.4005231559276581f, 0.5153511762619019f, 0.6480686664581299f, 1.0f);
+	style.Colors[ImGuiCol_ResizeGrip] = ImVec4(0.2588235437870026f, 0.5882353186607361f, 0.9764705896377563f, 0.2000000029802322f);
+	style.Colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.2588235437870026f, 0.5882353186607361f, 0.9764705896377563f, 0.6700000166893005f);
+	style.Colors[ImGuiCol_ResizeGripActive] = ImVec4(0.2588235437870026f, 0.5882353186607361f, 0.9764705896377563f, 0.949999988079071f);
+	style.Colors[ImGuiCol_Tab] = ImVec4(0.2271178215742111f, 0.3391363620758057f, 0.3862661123275757f, 0.8619999885559082f);
+	style.Colors[ImGuiCol_TabHovered] = ImVec4(0.2007773220539093f, 0.3056237101554871f, 0.4291845560073853f, 0.800000011920929f);
+	style.Colors[ImGuiCol_TabActive] = ImVec4(0.2952531576156616f, 0.456860363483429f, 0.5021458864212036f, 1.0f);
+	style.Colors[ImGuiCol_TabUnfocused] = ImVec4(0.06666667014360428f, 0.1019607856869698f, 0.1450980454683304f, 0.9724000096321106f);
+	style.Colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.1333333402872086f, 0.2588235437870026f, 0.4235294163227081f, 1.0f);
+	style.Colors[ImGuiCol_PlotLines] = ImVec4(0.6078431606292725f, 0.6078431606292725f, 0.6078431606292725f, 1.0f);
+	style.Colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.0f, 0.4274509847164154f, 0.3490196168422699f, 1.0f);
+	style.Colors[ImGuiCol_PlotHistogram] = ImVec4(0.8980392217636108f, 0.6980392336845398f, 0.0f, 1.0f);
+	style.Colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.0f, 0.6000000238418579f, 0.0f, 1.0f);
+	style.Colors[ImGuiCol_TableHeaderBg] = ImVec4(0.1882352977991104f, 0.1882352977991104f, 0.2000000029802322f, 1.0f);
+	style.Colors[ImGuiCol_TableBorderStrong] = ImVec4(0.3098039329051971f, 0.3098039329051971f, 0.3490196168422699f, 1.0f);
+	style.Colors[ImGuiCol_TableBorderLight] = ImVec4(0.2274509817361832f, 0.2274509817361832f, 0.2470588237047195f, 1.0f);
+	style.Colors[ImGuiCol_TableRowBg] = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+	style.Colors[ImGuiCol_TableRowBgAlt] = ImVec4(1.0f, 1.0f, 1.0f, 0.05999999865889549f);
+	style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.1609902381896973f, 0.9764963984489441f, 0.9871244430541992f, 0.3499999940395355f);
+	style.Colors[ImGuiCol_DragDropTarget] = ImVec4(1.0f, 1.0f, 0.0f, 0.8999999761581421f);
+	style.Colors[ImGuiCol_NavHighlight] = ImVec4(0.2588235437870026f, 0.5882353186607361f, 0.9764705896377563f, 1.0f);
+	style.Colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.0f, 1.0f, 1.0f, 0.699999988079071f);
+	style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.800000011920929f, 0.800000011920929f, 0.800000011920929f, 0.2000000029802322f);
+	style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.800000011920929f, 0.800000011920929f, 0.800000011920929f, 0.3499999940395355f);
 }
