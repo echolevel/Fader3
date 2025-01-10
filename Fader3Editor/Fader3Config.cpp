@@ -21,7 +21,7 @@
 Fader3::Fader3()
 {
 	width = 330;
-	height = 500;
+	height = 600;
 
 	MidiInIndex = 0;
 	MidiOutIndex = 0;
@@ -271,12 +271,14 @@ void Fader3::Update(GLFWwindow* window)
 		{
 			refreshMidiPorts();
 		}
+		ImGui::SetItemTooltip("Empty the list of discovered\n MIDI ports and search again");
 
 		ImGui::SameLine();
 		if (ImGui::Button(ICON_FA_PLUG_CIRCLE_XMARK " Release"))
 		{
 			releaseMidiPorts(inputStatus, outputStatus);
 		}
+		ImGui::SetItemTooltip("Close any open MIDI ports so\n other programs can use them");
 
 
 		// Settings table
@@ -309,7 +311,7 @@ void Fader3::Update(GLFWwindow* window)
 				else
 				{
 					ImGui::AlignTextToFramePadding();
-					ImGui::Text("Fader #%d", i + 1);
+					ImGui::Text("Fader %d", i + 1);
 
 					ImGui::PushID(i);
 					ImGui::PushItemWidth(40.f);
@@ -320,12 +322,12 @@ void Fader3::Update(GLFWwindow* window)
 						settings->f14bit[i] = f14bit;
 					}
 
-					ImGui::DragInt("##Chan", &settings->chan[i], 1.0f, 1, 16);
-					ImGui::SetItemTooltip("Ctrl+Click to enter value manually");
+					ImGui::DragInt("##Chan", &settings->chan[i], 0.1f, 1, 16);
+					ImGui::SetItemTooltip("Drag to adjust, or Ctrl+Click\n to enter value manually");
 
-					ImGui::DragInt("##CC #", &settings->ccNum[i], 1.0f, 0, 127);
+					ImGui::DragInt("##CC #", &settings->ccNum[i], 0.1f, 0, 127);
 
-					ImGui::SetItemTooltip("Ctrl+Click to enter value manually");
+					ImGui::SetItemTooltip("Drag to adjust, or Ctrl+Click\n to enter value manually");
 
 					ImGui::PopID();
 					ImGui::PopItemWidth();
@@ -361,19 +363,19 @@ void Fader3::Update(GLFWwindow* window)
 
 					if (i == 1)
 					{
-						ImGui::DragInt("14-bit##smooth", &settings->smooth14bit, 1.0f, 0, 63);
-						ImGui::SetItemTooltip("Ctrl+Click to enter value manually");
+						ImGui::DragInt("14-bit##smooth", &settings->smooth14bit, 0.1f, 0, 63);
+						ImGui::SetItemTooltip("Drag to adjust, or Ctrl+Click to\n enter value manually\n Smoothing averages\n the incoming value over n \nsamples to reduce jitter \n(high values may increase latency)");
 
-						ImGui::DragInt("14-bit##thresh", &settings->thresh14bit, 1.0f, 0, 127);
-						ImGui::SetItemTooltip("Ctrl+Click to enter value manually");
+						ImGui::DragInt("14-bit##thresh", &settings->thresh14bit, 0.1f, 0, 127);
+						ImGui::SetItemTooltip("Drag to adjust, or Ctrl+Click to\n enter value manually\n New values are only\n accepted when the delta\n (change) threshold is exceeded.\n May help with jitter or over-\nsensitive hardware.");
 					}
 					else if (i == 2)
 					{
-						ImGui::DragInt("7-bit##smooth", &settings->smooth7bit, 1.0f, 0, 63);
-						ImGui::SetItemTooltip("Ctrl+Click to enter value manually");
+						ImGui::DragInt("7-bit##smooth", &settings->smooth7bit, 0.1f, 0, 63);
+						ImGui::SetItemTooltip("Drag to adjust, or Ctrl+Click to\n enter value manually\n Smoothing averages\n the incoming value over n \nsamples to reduce jitter \n(high values may increase latency)");
 
-						ImGui::DragInt("7-bit##thresh", &settings->thresh7bit, 1.0f, 0, 127);
-						ImGui::SetItemTooltip("Ctrl+Click to enter value manually");
+						ImGui::DragInt("7-bit##thresh", &settings->thresh7bit, 0.1f, 0, 127);
+						ImGui::SetItemTooltip("Drag to adjust, or Ctrl+Click to\n enter value manually\n New values are only\n accepted when the delta\n (change) threshold is exceeded.\n May help with jitter or over-\nsensitive hardware.");
 					}
 					ImGui::PopID();
 					ImGui::PopItemWidth();
@@ -415,6 +417,7 @@ void Fader3::Update(GLFWwindow* window)
 					message.push_back(0xF7);
 					midiout->sendMessage(&message);
 				}
+				ImGui::SetItemTooltip("Request a config dump from the device");
 			}
 
 
@@ -465,6 +468,36 @@ void Fader3::Update(GLFWwindow* window)
 
 
 		ImGui::Text("Midi Monitor");
+
+		ImGui::AlignTextToFramePadding();
+		ImGui::Text("Filter:");
+
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(28.f);
+		ImGui::DragInt("Ch", &filterChannel, 0.1f, 0, 16);
+		ImGui::SetItemTooltip("Show only CC messages from this\nchannel (0 to disable)");
+
+		ImGui::SameLine();
+		ImGui::SetNextItemWidth(28.f);
+		ImGui::DragInt("CC", &filterCC, 0.1f, -1, 127);
+		ImGui::SetItemTooltip("Show only CC messages for\nthis CC number (-1 to disable)");
+		
+		static bool filter14check = filter14bit;
+		ImGui::SameLine();
+		if(ImGui::Checkbox("14bit", &filter14check))
+		{
+			filter14bit = filter14check;
+		}
+		ImGui::SetItemTooltip("Show only 14bit CC messages");
+
+		static bool displayRawcheck = displayRaw;
+		ImGui::SameLine();
+		if (ImGui::Checkbox("raw", &displayRawcheck))
+		{
+			displayRaw = displayRawcheck;
+		}
+		ImGui::SetItemTooltip("Show all incoming raw bytes");
+		
 		static ImGuiInputTextFlags flags = ImGuiInputTextFlags_ReadOnly | ImGuiInputTextFlags_NoHorizontalScroll;
 
 		std::string multilines;
@@ -748,19 +781,17 @@ static void midiInCallback(double deltatime, std::vector<unsigned char>* message
 	{
 		return;
 	}
-	std::stringstream debugout;
 
-	for (unsigned char byte : *message)
-	{
-		debugout << (int)byte << " ";
-	}
-
-	globalInstance->Log(debugout.str().c_str());
+	int ccNum = 0;
+	int ccChan = 0;
+	int ccValue = 0;
+	bool is14bit = false;
+	int value14bit = 0;
 
 	std::stringstream finalhexout;
 
 	// Is this a sysex message?
-	if (((int)message->at(0) == 0xF0) && message->size() >= 14)
+	if (((int)message->at(0) == 0xF0) && (message->size() >= 14) && !globalInstance->displayRaw)
 	{
 		std::vector<unsigned char>::iterator it = message->begin();
 
@@ -783,14 +814,14 @@ static void midiInCallback(double deltatime, std::vector<unsigned char>* message
 	}
 
 	// Is this a control message status byte? Check if MSB is 0B
-	else if (((int)message->at(0) >> 4) == 0x0b)
+	else if ((((int)message->at(0) >> 4) == 0x0b) && !globalInstance->displayRaw)
 	{
-		int ccNum = (int)message->at(1);
-		int ccChan = ((int)message->at(0) & 0x0F) + 1;
-		int ccValue = (int)message->at(2);
+		ccNum = (int)message->at(1);
+		ccChan = ((int)message->at(0) & 0x0F) + 1;
+		ccValue = (int)message->at(2);
 
-		bool is14bit = false;
-		int value14bit = 0;
+		is14bit = false;
+		value14bit = 0;
 		// If this CC number is equal to the last one + 32, and the channel is the same, it's 14-bit o'clock
 		if ((ccNum == (globalInstance->lastCCnum + 32)) && (ccChan == globalInstance->lastChannel))
 		{
@@ -812,6 +843,7 @@ static void midiInCallback(double deltatime, std::vector<unsigned char>* message
 		{
 			finalhexout << " Value 14bit: " << value14bit;
 		}
+		// Only display 7bit values if the 14bit filter is disabled
 		else
 		{
 			finalhexout << " Value 7bit: " << ccValue;
@@ -828,6 +860,23 @@ static void midiInCallback(double deltatime, std::vector<unsigned char>* message
 	{
 		finalhexout << std::setfill('0') << std::setw(sizeof(char) * 2) << std::hex << int(*it) << " ";
 	}
+
+	// Always display raw bytes if filter enabled
+	if (!globalInstance->displayRaw)
+	{
+		// Die if channel filter is enabled and this doesn't match
+		if (globalInstance->filterChannel >= 1 && ccChan != globalInstance->filterChannel)
+			return;
+
+		// Die if CC filter is enabled and this doesn't match
+		if (globalInstance->filterCC >= 0 && ccNum != globalInstance->filterCC)
+			return;
+
+		// Die if this is a 7bit value but the 14-bit filter is enabled
+		if (globalInstance->filter14bit && !is14bit)
+			return;
+	}
+	
 
 	globalInstance->Log(finalhexout.str().c_str());
 

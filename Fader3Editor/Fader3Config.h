@@ -13,7 +13,7 @@
 #include <unordered_map>
 
 #define LINEBUFFERMAX 192
-#define LINESMAX 16
+#define LINESMAX 1023
 
 struct GLFWwindow;
 
@@ -103,6 +103,12 @@ public:
     int lastChannel;
     int lastCCnum;
     int lastCCvalue;
+
+	// Filter incoming messages by
+	int filterChannel = 0; // show only this channel (0 disables)
+	int filterCC = -1; // show only this CC number (-1 disables)
+	bool filter14bit= false; // show only 14bit values 
+	bool displayRaw = false; // show only raw bytes
 
 	// Main ImGui draw window
 	void Update(GLFWwindow* window);
