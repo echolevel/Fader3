@@ -1,7 +1,7 @@
 # Fader3
  3-fader USB MIDI controller
 
-![photo of Fader3 on a desk](hero_shot.jpg)
+![photo of Fader3 on a desk](f_wide_shot.jpg)
 
 ## Project Spec
 
@@ -30,6 +30,7 @@ However...it appears that none of the above do 14-bit MIDI. So if you really wan
 ## Requirements:
 
 ### Hardware
+![TinkerCAD view of the case design](Case_Parts.jpg)
 * Raspberry Pi Pico
 * Three 100mm-throw B-taper (linear) faders matching [these dimensions](https://www.bourns.com/docs/Product-Datasheets/PTB.pdf)
 * ADS1115 analogue-digital converter board
@@ -42,6 +43,9 @@ However...it appears that none of the above do 14-bit MIDI. So if you really wan
 * Mu editor [via these instructions](https://learn.adafruit.com/getting-started-with-raspberry-pi-pico-circuitpython/installing-mu-editor)
 * OR Visual Studio Code with the [CircuitPython v2 extension](https://marketplace.visualstudio.com/items?itemName=wmerkens.vscode-circuitpython-v2)
 
+### Editor Software
+![Fader3 Editor app](f_editor_screen.jpg)
+* [Windows executable](https://github.com/echolevel/Fader3/releases/tag/v0.1.0) (source available - should be possible to compile for MacOS and Linux)
 
 ## Instructions:
 
@@ -54,8 +58,6 @@ Note that the case has a 0.2mm layer over the top: this is not a mistake. Firstl
 You'll have to cut through the slot and bolt holes. I recommend starting the bolt holes with an awl, then drilling through with a 3mm bit in a pin vice (small unpowered hobby drill), and finishing with a needle file until M3 bolts pass through comfortably. Holding the case up to a light shows where the holes are.
 
 Similar for the slots: use a sharp knife to slowly puncture the end of each slot and drag down carefully. A steel rule will help avoid veering off and cutting into the main body of the case. When they're all cut, a ~2mm emery board or sanding stick should be used in each slot until the fader can fit through and slide up and down unimpeded.
-
-![TinkerCAD view of the case design](Case_Parts.jpg)
 
 The Pi Pico sits in the base, and the micro USB socket should line up nicely with the case top. It's advisable to bolt down the Pico - M2 bolts should be used, with appropriate holes drilled through the base (the pin vice again!). M2*6 bolts with M2 nuts on the underside should work, and won't scrape your desk since you'll be sticking rubber feet on all four corners of the base.
 
@@ -89,16 +91,15 @@ If everything's soldered up properly, then you should now be able to replug the 
 
 ## Config options:
 
-* faderEnabled: set True or False to toggle a fader on or off
 * faderMidiChannel (array): set a MIDI channel for each fader separately
 * faderCCNumber: set a CC number for each fader separately
 * enable14bitmode: set True or False to enable 14-bit MIDI mode on each individual fader
-* faderCustomRange: set custom lower and upper range values and output will be scaled accordingly. In 7-bit mode, the lower value will be clamped between 0 and 126 while the upper value will be clamped between 1 and 127. In 14-bit mode, lower value is clamped between 0 and 16382 and upper value is clamped between 1 and 16383. If the lower value is larger than the upper value, output is effectively inverted.
 * smoothingSamples14bit: if you're experiencing jitter, adjusting this value might help. Higher values mean more smoothing but introduce slightly more lag. The value represents the number of fader readings that are summed and averaged
 * smoothingSamples7bit: as above
 * newValueThreshold14bit: prevent new MIDI messages from being sent unless this threshold is exceeded by a new value above or below the previous value; this can reduce jitter and compensate for interference. Remember, if you use a custom range scaling significantly less than default, you'll probably need to reduce this value or else you'll see extremely low resolution: e.g. a custom range of 0-255 in 14-bit mode and a threshold of 20 will jump the value in increments of ~10 with no interpolation. Reducing the threshold to 1 in this instance would solve the problem.
 * newValueThreshold7bit: as above, but is way lower by default since you can't afford to lose too much resolution in 7-bit mode
-* enableDebugMode: when true, debug log output is printed to the serial monitor and can be viewed in Mu or VS Code
+
+The Fader3 Editor app is currently only compiled for Windows, but the code is hopefully portable enough that it can be compiled for MacOS and Linux without too much hassle. It uses glfw, RtMidi and Dear ImGui. When the correct MIDI ports are selected, it can read values from the hardware by sending a dump request as a sysex message. That syncs the Editor with the hardware; then once you've made adjustments in the Editor, you can write the updates back to the hardware. It also has a MIDI monitor with some handy filters for troubleshooting purposes.
 
 
 ## Notes:
@@ -140,11 +141,9 @@ I have three techniques for dealing with this:
 ## Changes / To Do:
 
 ### To do
-* Rotate case before exporting STL
-* Redesign base for ADS1115
-* Implement the sysex config
 * Consider a startup mode to force mass storage - maybe all faders to max when plugging in? 
 
 ### Changes
+* 2024-01-10 Editor app
 * 2024-01-04 14-bit support
 * 2024-01-01 Initial commit
